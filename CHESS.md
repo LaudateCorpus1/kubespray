@@ -59,3 +59,16 @@ Cluster configuration will be in /etc/kubernetes on the master nodes. You can in
 ```bash
 kubectl --kubeconfig=/etc/kubernetes/admin.conf -n kube-system get nodes
 ```
+
+### Examples:
+
+Remove a worker node (least disruptive to cluster). Check [the docs][1] for
+a reference:
+
+```bash
+ansible-playbook -i inventory/chesscom/inventory.ini -b -u <username> -e 'bastion_user=<username>' -e 'node=ce104' remove-node.yml
+```
+
+Then delete node from inventory/chesscom/iventory.ini. And done.
+
+[1]: https://github.com/ChessCom/kubespray/blob/chesscom-dev/docs/nodes.md#addingreplacing-a-worker-node
