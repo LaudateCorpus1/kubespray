@@ -26,9 +26,9 @@ SUPPORTED_OS = {
   "centos-bento"        => {box: "bento/centos-7.6",           user: "vagrant"},
   "centos8"             => {box: "centos/8",                   user: "vagrant"},
   "centos8-bento"       => {box: "bento/centos-8",             user: "vagrant"},
-  "fedora32"            => {box: "fedora/32-cloud-base",       user: "vagrant"},
   "fedora33"            => {box: "fedora/33-cloud-base",       user: "vagrant"},
-  "opensuse"            => {box: "bento/opensuse-leap-15.1",   user: "vagrant"},
+  "fedora34"            => {box: "fedora/34-cloud-base",       user: "vagrant"},
+  "opensuse"            => {box: "bento/opensuse-leap-15.2",   user: "vagrant"},
   "opensuse-tumbleweed" => {box: "opensuse/Tumbleweed.x86_64", user: "vagrant"},
   "oraclelinux"         => {box: "generic/oracle7",            user: "vagrant"},
   "oraclelinux8"        => {box: "generic/oracle8",            user: "vagrant"},
@@ -253,9 +253,9 @@ Vagrant.configure("2") do |config|
           #ansible.tags = ['download']
           ansible.groups = {
             "etcd" => ["#{$instance_name_prefix}-[1:#{$etcd_instances}]"],
-            "kube-master" => ["#{$instance_name_prefix}-[1:#{$kube_master_instances}]"],
-            "kube-node" => ["#{$instance_name_prefix}-[1:#{$kube_node_instances}]"],
-            "k8s-cluster:children" => ["kube-master", "kube-node"],
+            "kube_control_plane" => ["#{$instance_name_prefix}-[1:#{$kube_master_instances}]"],
+            "kube_node" => ["#{$instance_name_prefix}-[1:#{$kube_node_instances}]"],
+            "k8s_cluster:children" => ["kube_control_plane", "kube_node"],
           }
         end
       end

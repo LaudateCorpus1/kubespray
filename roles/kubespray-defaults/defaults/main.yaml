@@ -1,7 +1,7 @@
 ---
 # Use proxycommand if bastion host is in group all
 # This change obseletes editing ansible.cfg file depending on bastion existence
-ansible_ssh_common_args: "{% if 'bastion' in groups['all'] %} -o ProxyCommand='ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -W %h:%p {{ hostvars['bastion']['ansible_user'] }}@{{ hostvars['bastion']['ansible_host'] }} {% if ansible_ssh_private_key_file is defined %}-i {{ ansible_ssh_private_key_file }}{% endif %} ' {% endif %}"
+ansible_ssh_common_args: "{% if 'bastion' in groups['all'] %} -o ProxyCommand='ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -W %h:%p -p {{ hostvars['bastion']['ansible_port'] | default(22) }} {{ hostvars['bastion']['ansible_user'] }}@{{ hostvars['bastion']['ansible_host'] }} {% if ansible_ssh_private_key_file is defined %}-i {{ ansible_ssh_private_key_file }}{% endif %} ' {% endif %}"
 
 # selinux state
 preinstall_selinux_state: permissive
@@ -15,10 +15,10 @@ is_fedora_coreos: false
 disable_swap: true
 
 ## Change this to use another Kubernetes version, e.g. a current beta release
-kube_version: v1.20.2
+kube_version: v1.21.3
 
 ## The minimum version working
-kube_version_min_required: v1.18.0
+kube_version_min_required: v1.19.0
 
 ## Kube Proxy mode One of ['iptables','ipvs']
 kube_proxy_mode: ipvs
@@ -89,6 +89,7 @@ dns_mode: coredns
 enable_nodelocaldns: true
 nodelocaldns_ip: 169.254.25.10
 nodelocaldns_health_port: 9254
+nodelocaldns_bind_metrics_host_ip: false
 
 # Should be set to a cluster IP if using a custom cluster DNS
 manual_dns_server: ""
@@ -120,7 +121,7 @@ enable_coredns_k8s_endpoint_pod_names: false
 # Kubernetes configuration dirs and system namespace.
 # Those are where all the additional config stuff goes
 # the kubernetes normally puts in /srv/kubernetes.
-# This puts them in a sane location and namespace.
+# This puts them in a same location and namespace.
 # Editing those values will almost surely break something.
 kube_config_dir: /etc/kubernetes
 kube_script_dir: "{{ bin_dir }}/kubernetes-scripts"
@@ -147,11 +148,8 @@ kube_log_level: 2
 kube_network_plugin: calico
 kube_network_plugin_multus: false
 
-# Determines if calico-rr group exists
-peer_with_calico_rr: "{{ 'calico-rr' in groups and groups['calico-rr']|length > 0 }}"
-
-# Set to false to disable calico-upgrade
-calico_upgrade_enabled: true
+# Determines if calico_rr group exists
+peer_with_calico_rr: "{{ 'calico_rr' in groups and groups['calico_rr']|length > 0 }}"
 
 # Choose data store type for calico: "etcd" or "kdd" (kubernetes datastore)
 calico_datastore: "kdd"
@@ -233,12 +231,23 @@ kube_api_aggregator_routing: false
 # Profiling
 kube_profiling: false
 
+# Graceful Node Shutdown
+# This requires kubernetes >= 1.21.0
+kubelet_shutdown_grace_period: 60s
+# kubelet_shutdown_grace_period_critical_pods should be less than kubelet_shutdown_grace_period
+# to give normal pods time to be gracefully evacuated
+kubelet_shutdown_grace_period_critical_pods: 20s
+
 # Container for runtime
 container_manager: docker
 
 # Enable Kata Containers as additional container runtime
 # When enabled, it requires `container_manager` different than Docker
 kata_containers_enabled: false
+
+# Enable gVisor as an additional container runtime
+# gVisor is only supported with container_manager Docker or containerd
+gvisor_enabled: false
 
 # Enable crun as additional container runtime
 # When enabled, it requires container_manager=crio
@@ -268,7 +277,8 @@ docker_container_storage_setup: false
 ## Otherwise docker-storage-setup will be executed incorrectly.
 # docker_container_storage_setup_devs: /dev/vdb
 
-## Uncomment this if you have more than 3 nameservers, then we'll only use the first 3.
+## Only set this if you have more than 3 nameservers:
+## If true Kubespray will only use the first 3, otherwise it will fail
 docker_dns_servers_strict: false
 
 # Path used to store Docker data
@@ -312,7 +322,8 @@ docker_plugins: []
 etcd_kubeadm_enabled: false
 
 # Containerd options
-containerd_use_systemd_cgroup: false
+containerd_version: 1.4.6
+containerd_use_systemd_cgroup: true
 
 # Settings for containerized control plane (etcd/kubelet/secrets)
 # deployment type for legacy etcd mode
@@ -336,6 +347,7 @@ dashboard_enabled: false
 
 # Addons which can be enabled
 helm_enabled: false
+krew_enabled: false
 registry_enabled: false
 metrics_server_enabled: false
 enable_network_policy: true
@@ -357,6 +369,9 @@ cert_manager_enabled: false
 expand_persistent_volumes: false
 metallb_enabled: false
 
+# containerd official CLI tool
+nerdctl_enabled: false
+
 ## When OpenStack is used, Cinder version can be explicitly specified if autodetection fails (Fixed in 1.9: https://github.com/kubernetes/kubernetes/issues/50461)
 # openstack_blockstorage_version: "v1/v2/auto (default)"
 openstack_blockstorage_ignore_volume_az: "{{ volume_cross_zone_attachment | default('false') }}"
@@ -367,6 +382,7 @@ openstack_blockstorage_ignore_volume_az: "{{ volume_cross_zone_attachment | defa
 # Set Cinder topology zones (can be multiple zones, default not set)
 # cinder_topology_zones:
 #   - nova
+cinder_csi_ignore_volume_az: "{{ volume_cross_zone_attachment | default('false') }}"
 
 ## When OpenStack is used, if LBaaSv2 is available you can enable it with the following 2 variables.
 openstack_lbaas_enabled: false
@@ -384,16 +400,15 @@ openstack_lbaas_monitor_max_retries: "3"
 openstack_cacert: "{{ lookup('env','OS_CACERT') }}"
 
 # Default values for the external OpenStack Cloud Controller
-external_openstack_lbaas_use_octavia: true
+external_openstack_enable_ingress_hostname: false
 external_openstack_lbaas_create_monitor: false
 external_openstack_lbaas_monitor_delay: "1m"
 external_openstack_lbaas_monitor_timeout: "30s"
 external_openstack_lbaas_monitor_max_retries: "3"
 external_openstack_network_ipv6_disabled: false
-external_openstack_network_internal_networks:
-- ""
-external_openstack_network_public_networks:
-- ""
+external_openstack_lbaas_use_octavia: false
+external_openstack_network_internal_networks: []
+external_openstack_network_public_networks: []
 
 ## List of authorization modes that must be configured for
 ## the k8s cluster. Only 'AlwaysAllow', 'AlwaysDeny', 'Node' and
@@ -419,6 +434,7 @@ kubelet_protect_kernel_defaults: true
 ## List of key=value pairs that describe feature gates for
 ## the k8s cluster.
 kube_feature_gates: []
+kubeadm_feature_gates: []
 
 # Local volume provisioner storage classes
 # Levarages Ansibles string to Python datatype casting. Otherwise the dict_key isn't substituted
@@ -452,11 +468,11 @@ ssl_ca_dirs: |-
   ]
 
 # Vars for pointing to kubernetes api endpoints
-is_kube_master: "{{ inventory_hostname in groups['kube-master'] }}"
-kube_apiserver_count: "{{ groups['kube-master'] | length }}"
+is_kube_master: "{{ inventory_hostname in groups['kube_control_plane'] }}"
+kube_apiserver_count: "{{ groups['kube_control_plane'] | length }}"
 kube_apiserver_address: "{{ ip | default(fallback_ips[inventory_hostname]) }}"
 kube_apiserver_access_address: "{{ access_ip | default(kube_apiserver_address) }}"
-first_kube_master: "{{ hostvars[groups['kube-master'][0]]['access_ip'] | default(hostvars[groups['kube-master'][0]]['ip'] | default(fallback_ips[groups['kube-master'][0]])) }}"
+first_kube_master: "{{ hostvars[groups['kube_control_plane'][0]]['access_ip'] | default(hostvars[groups['kube_control_plane'][0]]['ip'] | default(fallback_ips[groups['kube_control_plane'][0]])) }}"
 loadbalancer_apiserver_localhost: "{{ loadbalancer_apiserver is not defined }}"
 loadbalancer_apiserver_type: "nginx"
 # applied if only external loadbalancer_apiserver is defined, otherwise ignored
@@ -464,6 +480,8 @@ apiserver_loadbalancer_domain_name: "lb-apiserver.kubernetes.local"
 kube_apiserver_global_endpoint: |-
   {% if loadbalancer_apiserver is defined -%}
       https://{{ apiserver_loadbalancer_domain_name }}:{{ loadbalancer_apiserver.port|default(kube_apiserver_port) }}
+  {%- elif use_localhost_as_kubeapi_loadbalancer|default(False)|bool -%}
+      https://127.0.0.1:{{ kube_apiserver_port }}
   {%- else -%}
       https://{{ first_kube_master }}:{{ kube_apiserver_port }}
   {%- endif %}
@@ -486,7 +504,7 @@ kube_apiserver_client_key: "{{ kube_cert_dir }}/ca.key"
 etcd_events_cluster_enabled: false
 
 # etcd group can be empty when kubeadm manages etcd
-etcd_hosts: "{{ groups['etcd'] | default(groups['kube-master']) }}"
+etcd_hosts: "{{ groups['etcd'] | default(groups['kube_control_plane']) }}"
 
 # Vars for pointing to etcd endpoints
 is_etcd_master: "{{ inventory_hostname in groups['etcd'] }}"
@@ -551,3 +569,23 @@ host_architecture: >-
 # Sets the eventRecordQPS parameter in kubelet-config.yaml. The default value is 5 (see types.go)
 # Setting it to 0 allows unlimited requests per second.
 kubelet_event_record_qps: 5
+
+proxy_env:
+  http_proxy: "{{ http_proxy | default ('') }}"
+  HTTP_PROXY: "{{ http_proxy | default ('') }}"
+  https_proxy: "{{ https_proxy | default ('') }}"
+  HTTPS_PROXY: "{{ https_proxy | default ('') }}"
+  no_proxy: "{{ no_proxy | default ('') }}"
+  NO_PROXY: "{{ no_proxy | default ('') }}"
+
+proxy_disable_env:
+  ALL_PROXY: ''
+  FTP_PROXY: ''
+  HTTPS_PROXY: ''
+  HTTP_PROXY: ''
+  NO_PROXY: ''
+  all_proxy: ''
+  ftp_proxy: ''
+  http_proxy: ''
+  https_proxy: ''
+  no_proxy: ''

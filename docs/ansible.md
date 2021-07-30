@@ -4,28 +4,28 @@
 
 The inventory is composed of 3 groups:
 
-* **kube-node** : list of kubernetes nodes where the pods will run.
-* **kube-master** : list of servers where kubernetes master components (apiserver, scheduler, controller) will run.
+* **kube_node** : list of kubernetes nodes where the pods will run.
+* **kube_control_plane** : list of servers where kubernetes control plane components (apiserver, scheduler, controller) will run.
 * **etcd**: list of servers to compose the etcd server. You should have at least 3 servers for failover purpose.
 
-Note: do not modify the children of _k8s-cluster_, like putting
-the _etcd_ group into the _k8s-cluster_, unless you are certain
+Note: do not modify the children of _k8s_cluster_, like putting
+the _etcd_ group into the _k8s_cluster_, unless you are certain
 to do that and you have it fully contained in the latter:
 
 ```ShellSession
-k8s-cluster ⊂ etcd => kube-node ∩ etcd = etcd
+k8s_cluster ⊂ etcd => kube_node ∩ etcd = etcd
 ```
 
-When _kube-node_ contains _etcd_, you define your etcd cluster to be as well schedulable for Kubernetes workloads.
+When _kube_node_ contains _etcd_, you define your etcd cluster to be as well schedulable for Kubernetes workloads.
 If you want it a standalone, make sure those groups do not intersect.
-If you want the server to act both as master and node, the server must be defined
-on both groups _kube-master_ and _kube-node_. If you want a standalone and
-unschedulable master, the server must be defined only in the _kube-master_ and
-not _kube-node_.
+If you want the server to act both as control-plane and node, the server must be defined
+on both groups _kube_control_plane_ and _kube_node_. If you want a standalone and
+unschedulable control plane, the server must be defined only in the _kube_control_plane_ and
+not _kube_node_.
 
 There are also two special groups:
 
-* **calico-rr** : explained for [advanced Calico networking cases](calico.md)
+* **calico_rr** : explained for [advanced Calico networking cases](calico.md)
 * **bastion** : configure a bastion host if your nodes are not directly reachable
 
 Below is a complete inventory example:
@@ -40,7 +40,7 @@ node4 ansible_host=95.54.0.15 ip=10.3.0.4
 node5 ansible_host=95.54.0.16 ip=10.3.0.5
 node6 ansible_host=95.54.0.17 ip=10.3.0.6
 
-[kube-master]
+[kube_control_plane]
 node1
 node2
 
@@ -49,16 +49,16 @@ node1
 node2
 node3
 
-[kube-node]
+[kube_node]
 node2
 node3
 node4
 node5
 node6
 
-[k8s-cluster:children]
-kube-node
-kube-master
+[k8s_cluster:children]
+kube_node
+kube_control_plane
 ```
 
 ## Group vars and overriding variables precedence
@@ -66,9 +66,9 @@ kube-master
 The group variables to control main deployment options are located in the directory ``inventory/sample/group_vars``.
 Optional variables are located in the `inventory/sample/group_vars/all.yml`.
 Mandatory variables that are common for at least one role (or a node group) can be found in the
-`inventory/sample/group_vars/k8s-cluster.yml`.
-There are also role vars for docker, kubernetes preinstall and master roles.
-According to the [ansible docs](https://docs.ansible.com/ansible/playbooks_variables.html#variable-precedence-where-should-i-put-a-variable),
+`inventory/sample/group_vars/k8s_cluster.yml`.
+There are also role vars for docker, kubernetes preinstall and control plane roles.
+According to the [ansible docs](https://docs.ansible.com/ansible/latest/playbooks_variables.html#variable-precedence-where-should-i-put-a-variable),
 those cannot be overridden from the group vars. In order to override, one should use
 the `-e` runtime flags (most simple way) or other layers described in the docs.
 
@@ -79,7 +79,7 @@ Layer | Comment
 ------|--------
 **role defaults** | provides best UX to override things for Kubespray deployments
 inventory vars | Unused
-**inventory group_vars** | Expects users to use ``all.yml``,``k8s-cluster.yml`` etc. to override things
+**inventory group_vars** | Expects users to use ``all.yml``,``k8s_cluster.yml`` etc. to override things
 inventory host_vars | Unused
 playbook group_vars | Unused
 playbook host_vars | Unused
@@ -187,3 +187,28 @@ For more information about Ansible and bastion hosts, read
 ## Mitogen
 
 You can use [mitogen](mitogen.md) to speed up kubespray.
+
+## Beyond ansible 2.9
+
+Ansible project has decided, in order to ease their maintenance burden, to split between
+two projects which are now joined under the Ansible umbrella.
+
+Ansible-base (2.10.x branch) will contain just the ansible language implementation while
+ansible modules that were previously bundled into a single repository will be part of the
+ansible 3.x package. Pleasee see [this blog post](https://blog.while-true-do.io/ansible-release-3-0-0/)
+that explains in detail the need and the evolution plan.
+
+**Note:** this change means that ansible virtual envs cannot be upgraded with `pip install -U`.
+You first need to uninstall your old ansible (pre 2.10) version and install the new one.
+
+```ShellSession
+pip uninstall ansible
+cd kubespray/
+pip install -U .
+```
+
+**Note:** some changes needed to support ansible 2.10+ are not backwards compatible with 2.9
+Kubespray needs to evolve and keep pace with upstream ansible and will be forced to eventually
+drop 2.9 support. Kubespray CIs use only the ansible version specified in the `requirements.txt`
+and while the `ansible_version.yml` may allow older versions to be used, these are not
+exercised in the CI and compatibility is not guaranteed.
