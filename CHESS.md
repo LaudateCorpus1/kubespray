@@ -11,6 +11,27 @@ Also make sure devtools is setup in ~/.ssh/config for port 2022, username, hostn
 Follow [ssh directions](https://app.tettra.co/teams/chesscom/pages/ssh-config).
 
 ```bash
+Host devtools bobby
+    User lukaszzulnowski
+    Port 2022
+    IdentitiesOnly yes
+    IdentityFile ~/.ssh/id_rsa
+
+Host *.chess.com
+    HostName %h
+    Port 2022
+    User lukaszzulnowski
+    ProxyJump bobby
+
+Host devtools
+    HostName devtools.access.chess.com
+
+Host bobby
+    HostName bobby.chess.com
+
+```
+
+```bash
 yum|rpm|apt install virtualenvwrapper
 # or brew install virtualenvwrapper
 ```
@@ -49,10 +70,9 @@ pip install -r requirements.txt
 When you're ready, you can deploy the cluster. Ansible will ssh through the bastion host (devtools) and then ssh into the cluster hosts to install software, configure docker and many other services, and run containers. This took about 57mins the first time on fresh hosts:
 
 ```bash
-ansible-playbook -v -i inventory/chesscom/inventory.ini -b -u <username> -e 'bastion_user=<username>' cluster.yml
+ansible-playbook -v -i inventory/chesscom/inventory.ini -b -u <username>  cluster.yml
 ```
 
-###### Note: the username for bastion_user can differ from the username in `-u <username>`.
 
 Cluster configuration will be in /etc/kubernetes on the master nodes. You can interact with the cluster:
 
