@@ -92,3 +92,12 @@ ansible-playbook -i inventory/chesscom/inventory.ini -b -u <username> -e 'bastio
 Then delete node from inventory/chesscom/iventory.ini. And done.
 
 [1]: https://github.com/ChessCom/kubespray/blob/chesscom-dev/docs/nodes.md#addingreplacing-a-worker-node
+
+
+### Connection to cluster
+
+Connection could be done from master host or by ssh tunnel to one of masters
+
+```bash
+ssh  -N ce101.int.chess.com -J bobby -L 6443:localhost:6443
+```
