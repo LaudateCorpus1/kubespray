@@ -1,4 +1,5 @@
 ---
+override_system_hostname: false
 # Kubernetes configuration dirs and system namespace.
 # Those are where all the additional config stuff goes
 # the kubernetes normally puts in /srv/kubernetes.
