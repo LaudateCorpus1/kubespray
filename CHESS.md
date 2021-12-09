@@ -1,3 +1,7 @@
+#Fresh docs
+[Instructions](https://www.notion.so/chesscom/Kubespray-instructions-cfd0ec6417ec473d844bd687561734e0)
+[Runbooks](https://www.notion.so/chesscom/Kubespray-instructions-cfd0ec6417ec473d844bd687561734e0)
+
 # Kubespray deployment on chess.com hardware
 
 ## Prerequisites
